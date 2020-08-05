@@ -4,9 +4,7 @@
 
 必须要有的着色器：顶点着色器，片段着色器
 
-
-
-
+**注意代码的顺序，先处理shader，再处理定点对象VBO和顶点数组对象VAO， 而且都应该写在while循环外面**
 
 **图形渲染管线**可以被划分为两个主要部分：第一部分把你的3D坐标转换为2D坐标，第二部分是把2D坐标转变为实际的有颜色的像素。*2D坐标和像素也是不同的，2D坐标精确表示一个点在2D空间中的位置，而2D像素是这个点的近似值，2D像素受到你的屏幕/窗口分辨率的限制*。（***就像是画直线的那个算法一样，拟合的***）
 
@@ -36,7 +34,7 @@
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-##### 步骤：
+##### 顶点着色器处理步骤：
 
 ~~~cpp
 //3D坐标的定义
@@ -63,7 +61,7 @@ glGenBuffers(1, &VBO);
 // 指定之前生成的对象是顶点缓冲对象
 glBindBuffer(GL_ARRAY_BUFFER, VBO);  
 
-//把之前的顶点数据传到定点对象，最后一个参数是表示GL_STATIC_DRAW ：数据不会或几乎不会改变。GL_DYNAMIC_DRAW：数据会被改变很多。GL_STREAM_DRAW ：数据每次绘制时都会改变。
+//把之前的顶点数据传到顶点对象，最后一个参数是表示GL_STATIC_DRAW ：数据不会或几乎不会改变。GL_DYNAMIC_DRAW：数据会被改变很多。GL_STREAM_DRAW ：数据每次绘制时都会改变。
 glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 ~~~
 
@@ -98,4 +96,124 @@ glCompileShader(vertexShader);
 
 
 -----------------------------------------------------------------------------------------------------------------------------------------------------
+
+##### 片段着色器处理步骤：
+
+片段着色器所做的是计算像素最后的颜色输出。
+
+大致步骤同上面的顶点着色器：
+
+唯一的不同是这里的glsl用的是out关键字(输出变量)，顶点着色器用的是in关键字（在顶点着色器中声明所有的输入顶点属性(Input Vertex Attribute)）
+
+~~~glsl
+#version 330 core
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+} 
+~~~
+
+
+
+
+
+~~~cpp
+//创建着色器对象
+unsigned int fragmentShader;
+fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+
+//指定着色器类型
+glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+//编译着色器
+glCompileShader(fragmentShader);
+~~~
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+**处理所有的着色器**
+
+着色器程序对象(Shader Program Object)是多个着色器合并之后并最终链接完成的版本。如果要使用刚才编译的着色器我们必须把它们链接(Link)为一个着色器程序对象，然后在渲染对象的时候激活这个着色器程序。已激活着色器程序的着色器将在我们发送渲染调用的时候被使用。
+
+当链接着色器至一个程序的时候，它会把每个着色器的输出链接到下个着色器的输入。当输出和输入不匹配的时候，你会得到一个连接错误。
+
+
+
+##### 步骤：
+
+**创建一个着色器程序对象**
+
+~~~cpp
+unsigned int shaderProgram;
+shaderProgram = glCreateProgram();
+~~~
+
+**附加之前创建的顶点着色器和片段着色器到着色器程序对象上面**
+
+~~~cpp
+//附加shader到着色器对象（整合）上面
+glAttachShader(shaderProgram, vertexShader);
+glAttachShader(shaderProgram, fragmentShader);
+//链接着色器
+glLinkProgram(shaderProgram);
+~~~
+
+**激活刚刚创建的着色器对象**
+
+~~~cpp
+glUseProgram(shaderProgram);
+~~~
+
+**删除之前创建的顶点着色器和片段着色器对象**
+
+​	**我的理解是**，一个着色器对象对应管理的是gpu中的一段内存， 而gpu是流水线处理的这里需要手动的释放掉
+
+~~~cpp
+// 删除顶点着色器对象
+glDeleteShader(vertexShader);
+// 删除片段着色器对象
+glDeleteShader(fragmentShader);
+~~~
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+##### 链接顶点属性
+
+顶点着色器允许我们指定任何以顶点属性为形式的输入。这使其具有很强的灵活性的同时，它还的确意味着我们必须手动指定输入数据的哪一个部分对应顶点着色器的哪一个顶点属性。所以，我们必须在渲染前指定OpenGL该如何解释顶点数据。
+
+
+
+​	**我的理解：**
+
+​	之前声明的是**vertices**是**float**数组，而不像是在游戏引擎里面的点的集合，所以需要告诉顶点属性到哪里算是一个点，这里是3个浮点数是一个点，而且这里没有间隙，紧密排列
+
+~~~cpp
+// 告诉OpenGL该如何解析顶点数据（应用到逐个顶点属性上）
+// 第五个参数是偏移量，最后一个也是偏移量表示数据在缓冲中起始位置的偏移量
+glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+// 
+glEnableVertexAttribArray(0);
+~~~
+
+
+
+~~~cpp
+// 0. 复制顶点数组到缓冲中供OpenGL使用
+glBindBuffer(GL_ARRAY_BUFFER, VBO);
+glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+// 1. 设置顶点属性指针
+glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+glEnableVertexAttribArray(0);
+// 2. 当我们渲染一个物体时要使用着色器程序
+glUseProgram(shaderProgram);
+// 3. 绘制物体
+someOpenGLFunctionThatDrawsOurTriangle();
+~~~
+
+
+
+
 
