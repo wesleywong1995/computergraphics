@@ -1,5 +1,6 @@
 #include <glad\glad.h> 
 #include <GLFW\glfw3.h>
+#include "Shader.h"
 
 #include <iostream>
 // 回调函数
@@ -18,28 +19,33 @@ void processInput(GLFWwindow *window)
 
 int main()
 {
-	// 定义输入的3d坐标
 	float vertices[] = {
-		-0.5f, -0.5f, 0.0f,
-		 0.5f, -0.5f, 0.0f,
-		 0.0f,  0.5f, 0.0f
+		// positions         // colors
+		 0.5f, -0.5f, 0.0f,  1.0f, 0.0f, 0.0f,  // bottom right
+		-0.5f, -0.5f, 0.0f,  0.0f, 1.0f, 0.0f,  // bottom left
+		 0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f   // top 
+
 	};
 
 
 	// 片段着色器代码
 	const char * fragmentShaderSource = "#version 330 core\n"
 		"out vec4 FragColor;\n"
+		"in vec3 ourColor;\n"
 		"void main()\n"
 		"{\n"
-		" FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n" //设置为黄色
-		"}\0";
+		"FragColor = vec4(ourColor, 1.0f);\n"
+		"}\n\0";
 
 	// 顶点着色器代码
 	const char * vertexShaderSource = "#version 330 core\n"
 		"layout (location = 0) in vec3 aPos;\n"
+		"layout (location = 1) in vec3 aColor;\n"
+		"out vec3 ourColor;\n"
 		"void main()\n"
 		"{\n"
-		" gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+		"gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+		"ourColor = aColor;\n"
 		"}\0";
 
 	glfwInit();
@@ -125,12 +131,12 @@ int main()
 	// 给vbo分配数据
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 	// 给对应的顶点属性数组指定数据
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
 
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
-
+	glUseProgram(shaderProgram);
 
 	// 渲染循环
 	while (!glfwWindowShouldClose(window))
@@ -143,7 +149,7 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT);	// 这两句搭配使用，一个是设置状态一个是使用状态
 
 		//绘制三角形
-		glUseProgram(shaderProgram);
+
 		glBindVertexArray(VAO); // 每一帧都需要重新绑定VAO？
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
